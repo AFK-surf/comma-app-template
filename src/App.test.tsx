@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { App } from "./App";
 import { createMockComma, type MockComma } from "./comma/mock";
 import { MemoryRouter } from "./router";
@@ -10,7 +16,10 @@ beforeEach(() => {
   mock = createMockComma({
     viewer: { id: "v1", name: "Ada", avatarUrl: null, guest: false },
   });
-  Object.defineProperty(globalThis, "comma", { value: mock, configurable: true });
+  Object.defineProperty(globalThis, "comma", {
+    value: mock,
+    configurable: true,
+  });
 });
 
 afterEach(() => {
@@ -19,17 +28,22 @@ afterEach(() => {
 });
 
 test("adds a note to the viewer's store", async () => {
-  render(
-    <MemoryRouter>
-      <App />
-    </MemoryRouter>
-  );
-  expect(await screen.findByText("Ada's notes")).toBeTruthy();
+  // The mock answers with promises only, so settling them is the wait.
+  await act(async () => {
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>,
+    );
+  });
+  expect(screen.getByText("Ada's notes")).toBeTruthy();
   fireEvent.change(screen.getByLabelText("New note"), {
     target: { value: "Buy milk" },
   });
-  fireEvent.click(screen.getByText("Add"));
-  expect(await screen.findByText("Buy milk")).toBeTruthy();
+  await act(async () => {
+    fireEvent.click(screen.getByText("Add"));
+  });
+  expect(screen.getByText("Buy milk")).toBeTruthy();
   expect(mock.mock.stores.user.get("notes")?.value).toEqual([
     expect.objectContaining({ text: "Buy milk" }),
   ]);
