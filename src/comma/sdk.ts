@@ -116,6 +116,11 @@ export interface MiniAppInit {
   /** Null unless `identity.basic` is granted. */
   viewer: MiniAppViewer | null;
   theme: MiniAppTheme;
+  /**
+   * Comma's theme as CSS custom properties, set on `<html>`: `--comma-background`, `--comma-foreground`,
+   * `--comma-muted`, `--comma-subtle`, `--comma-border`, `--comma-surface`, `--comma-accent`, `--comma-danger`,
+   * `--comma-success`, `--comma-warning` and `--comma-font`.
+   */
   tokens: Record<string, string>;
   locale: string;
   timeZone: string;

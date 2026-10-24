@@ -3,6 +3,29 @@
 This repository is a Comma app. Comma runs it inside the Comma Mac and web apps,
 in a sandboxed frame with no network and no URL of its own.
 
+## Tech stack
+
+Use this stack unless the user asks for another:
+
+- Node and npm. Keep `package-lock.json` in the repository.
+- Vite, TypeScript (strict) and React.
+- shadcn/ui for every control, card, dialog and form. Add a component with
+  `npx shadcn@latest add <name>`. It goes to `src/components/ui/`. Compose
+  screens from these components before you write your own.
+- Tailwind CSS for layout and spacing. Use the theme colors (`bg-background`,
+  `text-muted-foreground`, `border-border`, `bg-primary` and the rest). Do not
+  write hex colors or a second stylesheet.
+- lucide-react for icons.
+
+`src/index.css` maps Comma's theme (`--comma-*` variables that Comma sets on
+`<html>`) to the shadcn/ui tokens, for light and dark. Keep that mapping, so
+the app looks like Comma. Change only the mapping when the app needs its own
+colors.
+
+Do not add a UI library, CSS framework, state library or router beside these.
+Add another npm package only when the app needs it, and only if it works
+without network at run time.
+
 ## Build, test, deploy
 
 1. Install: `npm install`.
@@ -52,7 +75,9 @@ Run `npm run build` before each `app_deploy`. Never edit `dist/` or
   `unavailable`). Show the user a short message; do not crash. Check
   `comma.supports(op)` before you show a feature that needs a capability.
 - Follow the Comma theme: `<html>` has `data-theme` (`light` or `dark`) and
-  `color-scheme`. Use `comma.onTheme` for changes.
+  `color-scheme`. Tailwind's `dark:` variant follows `data-theme`, and the
+  theme colors change with it. Use `comma.onTheme` only for code that must react
+  to a change.
 
 ## Backend (optional)
 
@@ -70,3 +95,4 @@ Run `npm run build` before each `app_deploy`. Never edit `dist/` or
 
 - `src/comma/` (Comma updates these files).
 - The single-file build in `vite.config.ts`.
+- The `--comma-*` part of the theme mapping in `src/index.css`.

@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { MemoryRouter } from "./router";
-import "./styles.css";
+import "./index.css";
 
 // Inside Comma, the runtime installs window.comma before this script runs.
 // Outside Comma (`npm run dev`), an in-memory mock stands in for it.

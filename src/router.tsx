@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 
 /**
  * A memory router. The app runs in a frame without a URL of its own, so
@@ -45,8 +46,8 @@ export function Routes({ routes }: { routes: Record<string, () => ReactNode> }) 
 export function Link({ to, children }: { to: string; children: ReactNode }) {
   const { navigate } = useRouter();
   return (
-    <button type="button" className="link" onClick={() => navigate(to)}>
+    <Button type="button" variant="link" className="px-0" onClick={() => navigate(to)}>
       {children}
-    </button>
+    </Button>
   );
 }

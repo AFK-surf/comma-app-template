@@ -1,6 +1,8 @@
 /// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import { fileURLToPath } from "node:url";
 
 /**
  * Puts the whole app into `dist/index.html`: one inline module script and
@@ -42,7 +44,10 @@ function singleFile(): Plugin {
 const escape = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export default defineConfig({
-  plugins: [react(), singleFile()],
+  plugins: [react(), tailwindcss(), singleFile()],
+  resolve: {
+    alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
+  },
   base: "./",
   build: {
     outDir: "dist",

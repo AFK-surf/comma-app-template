@@ -8,6 +8,9 @@ Comma makes a new private repository from this template when you ask it to
 build an app. A coding agent then writes the app and deploys it with the
 station tool `app_deploy`. The rules for the agent are in [AGENTS.md](AGENTS.md).
 
+The stack is Node, Vite, TypeScript, React, shadcn/ui, Tailwind CSS and
+lucide-react icons. The shadcn/ui theme follows Comma's colors in light and dark.
+
 ## Develop locally
 
 ```sh
@@ -19,13 +22,15 @@ npm run build   # dist/index.html (and dist-worker/index.js with a backend)
 
 ## Files
 
-| Path             | Use                                                                                 |
-| ---------------- | ----------------------------------------------------------------------------------- |
-| `comma-app.json` | Name, capabilities, storage stores and the optional backend.                        |
-| `src/`           | The React frontend. `src/main.tsx` starts it.                                       |
-| `src/comma/`     | The Comma SDK (`sdk.ts`) and its local mock (`mock.ts`). Comma updates these files. |
-| `src/router.tsx` | A memory router. Apps do not use the URL.                                           |
-| `worker/`        | The optional backend (a Cloudflare Worker).                                         |
+| Path                 | Use                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| `comma-app.json`     | Name, capabilities, storage stores and the optional backend.                        |
+| `src/`               | The React frontend. `src/main.tsx` starts it.                                       |
+| `src/components/ui/` | shadcn/ui components. Add more with `npx shadcn@latest add <name>`.                 |
+| `src/index.css`      | Tailwind CSS and the shadcn/ui theme, mapped to Comma's `--comma-*` colors.         |
+| `src/comma/`         | The Comma SDK (`sdk.ts`) and its local mock (`mock.ts`). Comma updates these files. |
+| `src/router.tsx`     | A memory router. Apps do not use the URL.                                           |
+| `worker/`            | The optional backend (a Cloudflare Worker).                                         |
 
 ## `comma-app.json`
 

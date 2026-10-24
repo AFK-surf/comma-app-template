@@ -1,4 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { comma, CommaError } from "./comma/sdk";
 import { Link, Routes, useRouter } from "./router";
 
@@ -12,7 +22,7 @@ const notesKey = "notes";
 
 export function App() {
   return (
-    <main>
+    <main className="mx-auto flex max-w-xl flex-col gap-4 p-4">
       <Routes
         routes={{
           "/": () => <Notes />,
@@ -68,39 +78,57 @@ function Notes() {
   }
 
   return (
-    <section className="stack">
-      <header className="row">
-        <h1>{name ? `${name}'s notes` : "Notes"}</h1>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <CardTitle>{name ? `${name}'s notes` : "Notes"}</CardTitle>
+          <CardDescription>Kept for you on every device.</CardDescription>
+        </div>
         <Link to="/about">About</Link>
-      </header>
-      <form className="row" onSubmit={add}>
-        <input
-          aria-label="New note"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Write a note"
-        />
-        <button type="submit">Add</button>
-      </form>
-      {error && <p role="alert">{error}</p>}
-      <ul aria-label="Notes">
-        {notes.map((note) => (
-          <li key={note.id}>{note.text}</li>
-        ))}
-      </ul>
-    </section>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <form className="flex items-end gap-2" onSubmit={add}>
+          <div className="flex flex-1 flex-col gap-2">
+            <Label htmlFor="new-note">New note</Label>
+            <Input
+              id="new-note"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Write a note"
+            />
+          </div>
+          <Button type="submit">Add</Button>
+        </form>
+        {error && (
+          <p role="alert" className="text-destructive">
+            {error}
+          </p>
+        )}
+        <ul aria-label="Notes" className="flex flex-col divide-y">
+          {notes.map((note) => (
+            <li key={note.id} className="py-2">
+              {note.text}
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }
 
 function About() {
   const { back } = useRouter();
   return (
-    <section className="stack">
-      <h1>{comma.app.name}</h1>
-      <p>Version {comma.app.version}. Made with Comma.</p>
-      <button type="button" onClick={back}>
-        Back
-      </button>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle>{comma.app.name}</CardTitle>
+        <CardDescription>Version {comma.app.version}. Made with Comma.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button type="button" variant="outline" onClick={back}>
+          Back
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
