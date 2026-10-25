@@ -15,6 +15,7 @@
 export const miniAppCapabilities = [
   "identity.basic",
   "ai.chat",
+  "web.search",
   "chat.draft",
   "tasks.create",
   "files.pick",
@@ -29,7 +30,8 @@ export type MiniAppCapability = (typeof miniAppCapabilities)[number];
 /** The SDK operations of each capability. */
 export const miniAppCapabilityOps: Record<MiniAppCapability, readonly string[]> = {
   "identity.basic": ["viewer"],
-  "ai.chat": ["ai.chat"],
+  "ai.chat": ["ai.chat", "ai.decide"],
+  "web.search": ["web.search"],
   "chat.draft": ["chat.draft"],
   "tasks.create": ["tasks.propose"],
   "files.pick": ["files.pick"],
@@ -48,6 +50,8 @@ export type MiniAppStorageMethod = (typeof miniAppStorageMethods)[number];
 export type MiniAppOp =
   | "viewer"
   | "ai.chat"
+  | "ai.decide"
+  | "web.search"
   | "chat.draft"
   | "tasks.propose"
   | "files.pick"
@@ -117,9 +121,12 @@ export interface MiniAppInit {
   viewer: MiniAppViewer | null;
   theme: MiniAppTheme;
   /**
-   * Comma's theme as CSS custom properties, set on `<html>`: `--comma-background`, `--comma-foreground`,
-   * `--comma-muted`, `--comma-subtle`, `--comma-border`, `--comma-surface`, `--comma-accent`, `--comma-danger`,
-   * `--comma-success`, `--comma-warning` and `--comma-font`.
+   * Comma's design system tokens as CSS custom properties, set on `<html>`, resolved for the current theme.
+   * Colors: `--comma-background`, `--comma-surface`, `--comma-surface-strong`, `--comma-foreground`, `--comma-muted`,
+   * `--comma-subtle`, `--comma-faint`, `--comma-border`, `--comma-border-subtle`, `--comma-primary`,
+   * `--comma-primary-foreground`, `--comma-accent`, `--comma-danger`, `--comma-success`, `--comma-warning`.
+   * Radius: `--comma-radius-{sm,md,lg,xl,2xl}`. Type: `--comma-font`, `--comma-text-{xs,sm,md,lg,xl,2xl}` and each
+   * `--comma-text-<size>-leading`. Shadows: `--comma-shadow-{xs,sm,md,lg}`.
    */
   tokens: Record<string, string>;
   locale: string;
@@ -181,6 +188,44 @@ export interface MiniAppChatMessage {
   content: string;
 }
 
+export type MiniAppDecisionQuestion =
+  | { type: "choice"; instructions: string; criteria: Record<string, string> }
+  | { type: "noul"; instructions: string; criteria?: { true: string; false: string } }
+  | { type: "score"; instructions: string; criteria: string[] };
+
+/** One to eight independent questions, with at most 12 KiB of JSON in total. */
+export interface MiniAppDecisionRequest {
+  state: string | Record<string, unknown> | unknown[];
+  questions: Record<string, MiniAppDecisionQuestion>;
+}
+
+export type MiniAppDecisionAnswer =
+  | { type: "noul"; probability_bp: number }
+  | {
+      type: "choice";
+      choice: string;
+      probabilities_bp: Record<string, number>;
+      confidence_bp: number;
+    }
+  | {
+      type: "score";
+      score_milli: number;
+      probabilities_bp: Record<string, number>;
+      confidence_bp: number;
+    };
+
+export interface MiniAppDecisionResult {
+  model: string;
+  /** Probabilities use 0 to 10,000. Scores use 1,000 units per level, starting at zero. */
+  answers: Record<string, MiniAppDecisionAnswer>;
+}
+
+export interface MiniAppSearchResult {
+  title: string;
+  url: string;
+  text: string;
+}
+
 export interface MiniAppPickedFile {
   name: string;
   mime: string;
@@ -232,6 +277,8 @@ export interface MiniAppOpTable {
     args: { messages: MiniAppChatMessage[] };
     value: { role: "assistant"; content: string };
   };
+  "ai.decide": { args: MiniAppDecisionRequest; value: MiniAppDecisionResult };
+  "web.search": { args: { query: string }; value: MiniAppSearchResult[] };
   "chat.draft": { args: { text: string }; value: null };
   "tasks.propose": { args: { text: string }; value: { created: boolean } };
   "files.pick": {
@@ -308,10 +355,17 @@ export interface Comma {
   /** True when this app can call `op` on this platform. A grant may still be needed. */
   supports(op: MiniAppOp | (string & {})): boolean;
   viewer(): Promise<MiniAppViewer>;
+  /** All AI calls use the shared `ai.chat` capability and grant. */
   ai: {
     chat(
       messages: MiniAppChatMessage[]
     ): Promise<{ role: "assistant"; content: string }>;
+    /** Calls Comma's decision model with only the state supplied by this app. */
+    decide(request: MiniAppDecisionRequest): Promise<MiniAppDecisionResult>;
+  };
+  web: {
+    /** Searches the web for a query of at most 2,000 characters. Returns up to five results. */
+    search(query: string): Promise<MiniAppSearchResult[]>;
   };
   chat: { draft(text: string): Promise<void> };
   tasks: { propose(text: string): Promise<{ created: boolean }> };
@@ -358,8 +412,14 @@ export interface MiniAppFetchInit {
  * The error of every failed SDK call. `instanceof CommaError` also matches
  * errors that the Comma runtime made with its own copy of the class.
  */
+// `code` is typed by the interface, not a class field (see frame.ts); the
+// constructor defines it, so the merge describes the object it makes.
+/* oxlint-disable typescript/no-unsafe-declaration-merging */
+export interface CommaError {
+  readonly code: MiniAppErrorCode;
+}
 export class CommaError extends Error {
-  declare readonly code: MiniAppErrorCode;
+  /* oxlint-enable typescript/no-unsafe-declaration-merging */
   constructor(code: MiniAppErrorCode, message: string) {
     super(message);
     this.name = "CommaError";

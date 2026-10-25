@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import { MemoryRouter } from "./router";
+import { ToastProvider } from "./components/toast";
 import "./index.css";
 
 // Inside Comma, the runtime installs window.comma before this script runs.
@@ -13,8 +13,8 @@ if (import.meta.env.DEV && !("comma" in window)) {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <MemoryRouter>
+    <ToastProvider>
       <App />
-    </MemoryRouter>
-  </StrictMode>
+    </ToastProvider>
+  </StrictMode>,
 );

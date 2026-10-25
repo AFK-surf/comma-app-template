@@ -34,8 +34,16 @@ export interface FrameComma {
  * no imports at runtime, no references to anything outside its body.
  */
 export function createFrameComma(options: FrameCommaOptions): FrameComma {
+  // `code` is typed by the interface, not a class field: the class must stay
+  // plain JavaScript for every transform it passes through (Playwright's
+  // Babel rejects `declare` fields), and this function is sent as its source.
+  // The constructor defines `code`, so the merge describes the object it makes.
+  /* oxlint-disable typescript/no-unsafe-declaration-merging */
+  interface CommaError {
+    readonly code: MiniAppErrorCode;
+  }
   class CommaError extends Error {
-    declare readonly code: MiniAppErrorCode;
+    /* oxlint-enable typescript/no-unsafe-declaration-merging */
     constructor(code: MiniAppErrorCode, message: string) {
       super(message);
       this.name = "CommaError";
@@ -166,6 +174,11 @@ export function createFrameComma(options: FrameCommaOptions): FrameComma {
     viewer: async () => (await invoke("viewer", {})) as never,
     ai: {
       chat: async (messages) => (await invoke("ai.chat", { messages })) as never,
+      decide: async (request) => (await invoke("ai.decide", request)) as never,
+    },
+    web: {
+      search: async (query) =>
+        (await invoke("web.search", { query: requireText("query", query) })) as never,
     },
     chat: {
       draft: async (text) => {

@@ -17,6 +17,9 @@ import {
   type Comma,
   type MiniAppCalendarEvent,
   type MiniAppChatMessage,
+  type MiniAppDecisionRequest,
+  type MiniAppDecisionResult,
+  type MiniAppSearchResult,
   type MiniAppIdentity,
   type MiniAppPickedFile,
   type MiniAppStorageScope,
@@ -40,6 +43,12 @@ export interface MockCommaOptions {
   storage?: MiniAppStorageScope[];
   /** Answers `comma.ai.chat`. Default: echoes the last user message. */
   aiChat?: (messages: MiniAppChatMessage[]) => string | Promise<string>;
+  /** Answers `comma.ai.decide`. Without a handler the call fails with `unavailable`. */
+  aiDecide?: (
+    request: MiniAppDecisionRequest
+  ) => MiniAppDecisionResult | Promise<MiniAppDecisionResult>;
+  /** Answers `comma.web.search`. Default: no results. */
+  webSearch?: (query: string) => MiniAppSearchResult[] | Promise<MiniAppSearchResult[]>;
   /** Answers `comma.tasks.propose`: whether the user confirmed. Default: true. */
   confirmTask?: (text: string) => boolean | Promise<boolean>;
   /** Answers `comma.open`: whether the user confirmed. Default: true. */
@@ -196,6 +205,14 @@ export function createMockComma(options: MockCommaOptions = {}): MockComma {
   const run = async (op: string, args: Record<string, unknown>): Promise<unknown> => {
     const requirement = miniAppOpRequirement(op);
     if (!requirement) return fail("unsupported", `${op} is not an SDK operation.`);
+    if (op === "web.search" && viewer.guest)
+      fail("signup_required", "Sign up to search the web in apps.");
+    if (
+      requirement.kind === "capability" &&
+      requirement.capability === "ai.chat" &&
+      viewer.guest
+    )
+      fail("signup_required", "Sign up to use AI in apps.");
     if (requirement.kind === "capability" && !grants.has(requirement.capability))
       fail("not_granted", `${requirement.capability} is not granted.`);
     if (requirement.kind === "storage") {
@@ -203,8 +220,18 @@ export function createMockComma(options: MockCommaOptions = {}): MockComma {
       return storage(requirement.scope, method!, args);
     }
     switch (op) {
+      case "ai.decide":
+        if (!options.aiDecide)
+          return fail("unavailable", "Configure aiDecide in the local mock.");
+        return options.aiDecide(args as unknown as MiniAppDecisionRequest);
       case "viewer":
         return viewer;
+      case "web.search": {
+        const query = args.query as string;
+        if (!query.trim() || query.length > 2000)
+          fail("invalid", "query must contain 1 to 2,000 characters.");
+        return ((await options.webSearch?.(query.trim())) ?? []).slice(0, 5);
+      }
       case "ai.chat": {
         const messages = args.messages as MiniAppChatMessage[];
         const content = options.aiChat

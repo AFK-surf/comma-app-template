@@ -12,19 +12,41 @@ Use this stack unless the user asks for another:
 - shadcn/ui for every control, card, dialog and form. Add a component with
   `npx shadcn@latest add <name>`. It goes to `src/components/ui/`. Compose
   screens from these components before you write your own.
-- Tailwind CSS for layout and spacing. Use the theme colors (`bg-background`,
-  `text-muted-foreground`, `border-border`, `bg-primary` and the rest). Do not
-  write hex colors or a second stylesheet.
+- Tailwind CSS for layout and spacing. Do not write a second stylesheet.
 - lucide-react for icons.
-
-`src/index.css` maps Comma's theme (`--comma-*` variables that Comma sets on
-`<html>`) to the shadcn/ui tokens, for light and dark. Keep that mapping, so
-the app looks like Comma. Change only the mapping when the app needs its own
-colors.
 
 Do not add a UI library, CSS framework, state library or router beside these.
 Add another npm package only when the app needs it, and only if it works
 without network at run time.
+
+## Look
+
+`DESIGN.md` is the design guide. Read it before you build a screen, and
+check its last section before each deploy. In short:
+
+- The app uses Comma's design system and only its tokens. `src/index.css`
+  maps Comma's tokens (`--comma-*` variables that Comma sets on `<html>`) to
+  the shadcn/ui and Tailwind theme, for light and dark. Do not write a value
+  outside the theme: no hex, `rgb()` or named colors, no arbitrary values
+  (`text-[15px]`, `p-[13px]`), no fonts, no `dark:` color classes.
+- Build the app as a mature app is built: a phone app that the same code lays
+  out as an iPad app and a web app. Use `src/components/`: `AppShell`,
+  `useNavigation` and `useSizeClass` (navigation.tsx) for sections and screen
+  stacks, `Screen` (screen.tsx) for every screen, `SplitView` (split-view.tsx)
+  for a list and its detail, `Sheet` (sheet.tsx) for a task over a screen,
+  `List`, `ListItem` and `ListSection` (list.tsx), `EmptyState`, `ErrorState`
+  and `LoadingList` (state.tsx), `useToast` (toast.tsx), then shadcn/ui.
+- Set text by role (`text-body`, `text-headline`, `text-large-title`...),
+  never by size. A role is iOS's size on a touch screen and Comma's desktop
+  size with a mouse.
+- The app runs from 320px wide and inside a 360px tall chat card. The phone
+  layout is the default; the components switch to the iPad and web layouts.
+- Use another look only when the user asks for one: in the request, with a
+  screenshot or with a style file (design tokens, a stylesheet, a brand guide).
+  Then put that look's values in place of the Comma tokens it changes, in
+  `src/index.css` and nowhere else. The components keep using the theme classes.
+  Keep light and dark, and keep the Comma tokens for everything the look does not
+  set.
 
 ## Build, test, deploy
 
@@ -39,7 +61,8 @@ without network at run time.
 4. Deploy: call the station tool `app_deploy` with short `notes` on what
    changed. It commits and pushes your work, then sends the build to Comma.
    Fix every error it returns and call it again. The user sees the new
-   version in the chat. Only the app owner can publish it.
+   version in the chat. Report its app ID and Version to the Router.
+   The Router can publish with `internal.apps.publish` after this Task is ready for review.
 5. Backend errors: call the station tool `app_logs`.
 
 Run `npm run build` before each `app_deploy`. Never edit `dist/` or
@@ -57,27 +80,35 @@ Run `npm run build` before each `app_deploy`. Never edit `dist/` or
   - `comma.storage.user`: the current viewer, on all devices. 10 MiB per viewer.
   - `comma.storage.app`: shared by all viewers. 1 MiB per value, 100 MiB in all.
 - Do not use `localStorage`, `sessionStorage`, IndexedDB, cookies, Service
-  Workers, `window.open`, forms that submit, `alert` or `confirm`. They do not
-  work in the sandbox.
-- Do not use the URL or `history` for navigation. Use `src/router.tsx` (a memory router).
+  Workers, `window.open`, a form that submits to a URL (handle `onSubmit` and
+  call `preventDefault()`), `alert` or `confirm`. They do not work in the
+  sandbox.
+- Do not use the URL or `history` for navigation. Use `useNavigation()` from
+  `src/components/navigation.tsx` (stacks in memory).
 - Keep the build to one module script. Do not add code splitting or dynamic
   `import()` of app code. To load a large file on demand, keep it in `public/`
   and use `comma.asset("file.js")`.
 - Capabilities (`comma-app.json` `capabilities`) the app may ask for:
-  `identity.basic` (`comma.viewer()`), `ai.chat` (`comma.ai.chat`), `chat.draft`
+  `identity.basic` (`comma.viewer()`), `ai.chat` (all `comma.ai.*` calls),
+  `web.search` (`comma.web.search(query)`), `chat.draft`
   (`comma.chat.draft`), `tasks.create` (`comma.tasks.propose`), `files.pick`,
   `drive.app_folder` (`comma.drive.*`), `calendar.read` (Mac only),
   `notifications` (`comma.notify`), `clipboard.write`, `links.open` (`comma.open`).
   Ask only for what the app needs. The viewer grants them; a call can fail.
+- `comma.ai.decide({ state, questions })` uses the shared `ai.chat` grant and the viewer Workspace's credits.
+  Send only the state the model needs, with 1 to 8 typed questions and at most 12 KiB of JSON.
+  Use `choice`, `noul` or `score` questions as described in README.md. No app backend is needed.
+- Web search returns at most five `{title, url, text}` results for a query of 1 to 2,000 characters.
+  Comma sends the query to Exa after the viewer grants access. Guests must sign up. No app backend is needed.
 - Every SDK call can reject with `CommaError` (`code`: `unsupported`,
   `not_granted`, `denied`, `signup_required`, `app_paused`, `rate_limited`,
   `invalid`, `not_found`, `conflict`, `quota_exceeded`, `failed`,
   `unavailable`). Show the user a short message; do not crash. Check
   `comma.supports(op)` before you show a feature that needs a capability.
 - Follow the Comma theme: `<html>` has `data-theme` (`light` or `dark`) and
-  `color-scheme`. Tailwind's `dark:` variant follows `data-theme`, and the
-  theme colors change with it. Use `comma.onTheme` only for code that must react
-  to a change.
+  `color-scheme`. The theme colors change with it, so the app needs no `dark:`
+  classes for them. Use `comma.onTheme` only for code that must react to a
+  change.
 
 ## Backend (optional)
 
@@ -87,7 +118,7 @@ Run `npm run build` before each `app_deploy`. Never edit `dist/` or
   arrive at `https://app.invalid/<path>` with the header `x-comma-viewer`.
 - `fetch` from the backend reaches only https hosts in `egress` (at most 20).
 - Store data in `env.STORAGE` (see the comments in `worker/index.ts`).
-- Secrets are `env.<NAME>`. The app owner sets their values in Comma. Never
+- Secrets are `env.<NAME>`. The Router or app owner sets their values through Comma. Never
   put secret values in the repository.
 - Limits: 50 ms CPU and 50 subrequests per request; 1 MiB request body.
 
@@ -95,4 +126,5 @@ Run `npm run build` before each `app_deploy`. Never edit `dist/` or
 
 - `src/comma/` (Comma updates these files).
 - The single-file build in `vite.config.ts`.
-- The `--comma-*` part of the theme mapping in `src/index.css`.
+- The `--comma-*` mapping in `src/index.css`, unless the user asked for their
+  own look (see Look).
