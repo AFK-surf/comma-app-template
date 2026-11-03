@@ -54,10 +54,41 @@ npm run build   # dist/index.html (and dist-worker/index.js with a backend)
 - `icon`: a PNG, SVG or WebP file in `dist/` (at most 256 KiB). Optional.
 - `capabilities`: `identity.basic`, `ai.chat`, `web.search`, `chat.draft`, `tasks.create`,
   `files.pick`, `drive.app_folder`, `calendar.read`, `notifications`,
-  `clipboard.write`, `links.open`.
+  `clipboard.write`, `links.open`, and the device capabilities below.
 - `storage`: `app`, `user`, `device`.
 - `backend`: optional. At most 20 `egress` hosts (no IP addresses, no
   wildcards) and 20 `secrets` names (`A-Z`, `0-9`, `_`).
+
+## Device capabilities
+
+The app frame has no device access of its own. Comma uses the device for the
+app after the viewer allows it, and sends the app only the result.
+
+| Capability       | SDK                                         | Viewer                      |
+| ---------------- | ------------------------------------------- | --------------------------- |
+| `microphone`     | `comma.microphone.start(onSamples, onEnd?)` | Grants once                 |
+| `camera`         | `comma.camera.capture({ facing? })`         | Takes each photo            |
+| `location`       | `comma.location.current()`                  | Grants once                 |
+| `screen.wake`    | `comma.screen.keepAwake(on)`                | No grant                    |
+| `fullscreen`     | `comma.screen.fullscreen(on)`               | No grant                    |
+| `clipboard.read` | `comma.clipboard.read()`                    | Confirms each read          |
+| `share`          | `comma.share({ title?, text?, url? })`      | Uses the system share sheet |
+| `haptics`        | `comma.haptics(ms or [on, off, on, ...])`   | No grant                    |
+| `midi`           | `comma.midi.start(onMessage, onEnd?)`       | Grants once                 |
+
+- `microphone.start` calls `onSamples` with mono PCM chunks (`Float32Array`,
+  -1 to 1) at the returned `sampleRate`, without echo cancellation, noise
+  suppression or gain. Call `stop()` on the returned handle when done.
+- `midi.start` returns the input devices and calls `onMessage` with
+  `{ input, data, time }` for each message. System exclusive messages are not
+  sent.
+- `camera.capture` resolves with a JPEG `{ mime, width, height, data }`, or
+  null when the viewer closes the sheet.
+- `screen.fullscreen` and `share` need a click or a key press just before the
+  call. `haptics` resolves `{ played: false }` where the device cannot vibrate.
+- Platforms: Comma web runs all of them where the browser supports them. The
+  Mac app runs all except `location`, `share` and `haptics`. The iOS and
+  Android apps run none of them yet. Check `comma.supports(op)` first.
 
 ## Decision model
 

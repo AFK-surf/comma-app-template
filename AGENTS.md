@@ -93,7 +93,11 @@ Run `npm run build` before each `app_deploy`. Never edit `dist/` or
   `web.search` (`comma.web.search(query)`), `chat.draft`
   (`comma.chat.draft`), `tasks.create` (`comma.tasks.propose`), `files.pick`,
   `drive.app_folder` (`comma.drive.*`), `calendar.read` (Mac only),
-  `notifications` (`comma.notify`), `clipboard.write`, `links.open` (`comma.open`).
+  `notifications` (`comma.notify`), `clipboard.write`, `links.open` (`comma.open`),
+  and the device capabilities `microphone`, `camera`, `location`, `screen.wake`,
+  `fullscreen`, `clipboard.read`, `share`, `haptics`, `midi` (README.md,
+  "Device capabilities"). The frame cannot use `getUserMedia`, geolocation,
+  Web MIDI or other device APIs itself: use the SDK.
   Ask only for what the app needs. The viewer grants them; a call can fail.
 - `comma.ai.decide({ state, questions })` uses the shared `ai.chat` grant and the viewer Workspace's credits.
   Send only the state the model needs, with 1 to 8 typed questions and at most 12 KiB of JSON.

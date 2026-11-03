@@ -21,7 +21,12 @@ import {
   type MiniAppDecisionResult,
   type MiniAppSearchResult,
   type MiniAppIdentity,
+  type MiniAppLocation,
+  type MiniAppMidiInput,
+  type MiniAppMidiMessage,
+  type MiniAppPhoto,
   type MiniAppPickedFile,
+  type MiniAppShareArgs,
   type MiniAppStorageScope,
   type MiniAppStoredItem,
   type MiniAppTheme,
@@ -68,6 +73,20 @@ export interface MockCommaOptions {
    * `env`. Default: none (`comma.backend.fetch` fails with `unsupported`).
    */
   backend?: (request: Request) => Response | Promise<Response>;
+  /** Answers `comma.camera.capture`. Default: the viewer closes the sheet (null). */
+  capturePhoto?: (options: {
+    facing?: "user" | "environment";
+  }) => MiniAppPhoto | null | Promise<MiniAppPhoto | null>;
+  /** Answers `comma.location.current`. Default: fails with `unavailable`. */
+  location?: () => MiniAppLocation | Promise<MiniAppLocation>;
+  /** The text `comma.clipboard.read` returns. Default: the last text the app wrote, or "". */
+  clipboardText?: string;
+  /** Answers `comma.share`: whether the viewer shared. Default: true. */
+  confirmShare?: (content: MiniAppShareArgs) => boolean | Promise<boolean>;
+  /** The sample rate of `comma.microphone.start`. Default: 48000. */
+  sampleRate?: number;
+  /** The inputs of `comma.midi.start`. Default: none. */
+  midiInputs?: MiniAppMidiInput[];
   /** URLs for `comma.asset(path)`. Default: the path itself. */
   assets?: Record<string, string>;
 }
@@ -86,6 +105,14 @@ export interface MockComma extends Comma {
     clipboard: string[];
     tasks: string[];
     links: string[];
+    shares: MiniAppShareArgs[];
+    haptics: number[][];
+    /** Whether the app keeps the screen on, and shows full screen. */
+    screen: { awake: boolean; fullscreen: boolean };
+    /** Sends samples to the open microphone streams. */
+    microphone(samples: Float32Array): void;
+    /** Sends a message to the open MIDI streams. */
+    midi(message: MiniAppMidiMessage): void;
     /** Stored values by scope, then key. */
     stores: Record<
       MiniAppStorageScope,
@@ -136,6 +163,16 @@ export function createMockComma(options: MockCommaOptions = {}): MockComma {
     clipboard: [],
     tasks: [],
     links: [],
+    shares: [],
+    haptics: [],
+    screen: { awake: false, fullscreen: false },
+    microphone: (samples) => {
+      for (const stream of microphones) frame.streamData(stream, samples.slice());
+    },
+    midi: (message) => {
+      for (const stream of midis)
+        frame.streamData(stream, { ...message, data: message.data.slice() });
+    },
     stores: { device: new Map(), user: new Map(), app: new Map() },
     drive: new Map(),
     setTheme: (theme, tokens = {}) => frame.setTheme({ theme, tokens }),
@@ -195,6 +232,10 @@ export function createMockComma(options: MockCommaOptions = {}): MockComma {
       }
     }
   };
+
+  let streamSerial = 0;
+  const microphones = new Set<number>();
+  const midis = new Set<number>();
 
   const drivePath = (path: unknown) => {
     if (typeof path !== "string" || path.split("/").includes(".."))
@@ -295,6 +336,40 @@ export function createMockComma(options: MockCommaOptions = {}): MockComma {
       case "clipboard.write":
         state.clipboard.push(String(args.text));
         return null;
+      case "clipboard.read":
+        return { text: options.clipboardText ?? state.clipboard.at(-1) ?? "" };
+      case "microphone.start":
+        microphones.add(++streamSerial);
+        return { stream: streamSerial, sampleRate: options.sampleRate ?? 48_000 };
+      case "microphone.stop":
+        microphones.delete(Number(args.stream));
+        return null;
+      case "midi.start":
+        midis.add(++streamSerial);
+        return { stream: streamSerial, inputs: options.midiInputs ?? [] };
+      case "midi.stop":
+        midis.delete(Number(args.stream));
+        return null;
+      case "camera.capture":
+        return (await options.capturePhoto?.(args)) ?? null;
+      case "location.current":
+        if (!options.location)
+          return fail("unavailable", "Configure location in the local mock.");
+        return options.location();
+      case "screen.keepAwake":
+        state.screen.awake = args.on === true;
+        return null;
+      case "screen.fullscreen":
+        state.screen.fullscreen = args.on === true;
+        return null;
+      case "share": {
+        const shared = (await options.confirmShare?.(args)) ?? true;
+        if (shared) state.shares.push(args as MiniAppShareArgs);
+        return { shared };
+      }
+      case "haptics":
+        state.haptics.push(args.pattern as number[]);
+        return { played: true };
       case "links.open": {
         const url = String(args.url);
         if (!url.startsWith("https://")) fail("invalid", "Only https URLs open.");
