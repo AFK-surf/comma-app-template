@@ -95,9 +95,17 @@ Run `npm run build` before each `app_deploy`. Never edit `dist/` or
   `drive.app_folder` (`comma.drive.*`), `calendar.read` (Mac only),
   `notifications` (`comma.notify`), `clipboard.write`, `links.open` (`comma.open`),
   and the device capabilities `microphone`, `camera`, `location`, `screen.wake`,
-  `fullscreen`, `clipboard.read`, `share`, `haptics`, `midi` (README.md,
+  `fullscreen`, `clipboard.read`, `share`, `haptics`, `midi`, `usb`, `bluetooth` (README.md,
   "Device capabilities"). The frame cannot use `getUserMedia`, geolocation,
-  Web MIDI or other device APIs itself: use the SDK.
+  Web MIDI itself: use the SDK. For declared `usb` and `bluetooth` capabilities,
+  use `navigator.usb` and `navigator.bluetooth` directly. Start device selection
+  from a user click. Browser device grants belong to Comma, not to an individual
+  app. Other apps with the same capability can access those authorized devices.
+  Test API availability before you show a device control.
+  `comma.microphone.devices()` lists inputs and optional channel-count/sample-rate ranges.
+  Use `comma.microphone.startChannels` for separate PCM channels and indexed selection.
+  Channel indices are zero-based audio-stream positions, not physical port names.
+  See README.md for the options and sample callback. The existing `start` stays mono.
   Ask only for what the app needs. The viewer grants them; a call can fail.
 - `comma.ai.decide({ state, questions })` uses the shared `ai.chat` grant and the viewer Workspace's credits.
   Send only the state the model needs, with 1 to 8 typed questions and at most 12 KiB of JSON.

@@ -22,6 +22,7 @@ import {
   type MiniAppSearchResult,
   type MiniAppIdentity,
   type MiniAppLocation,
+  type MiniAppAudioInput,
   type MiniAppMidiInput,
   type MiniAppMidiMessage,
   type MiniAppPhoto,
@@ -85,6 +86,8 @@ export interface MockCommaOptions {
   confirmShare?: (content: MiniAppShareArgs) => boolean | Promise<boolean>;
   /** The sample rate of `comma.microphone.start`. Default: 48000. */
   sampleRate?: number;
+  /** The audio inputs of `comma.microphone.devices`; the first is the default. Default: one "Microphone". */
+  audioInputs?: MiniAppAudioInput[];
   /** The inputs of `comma.midi.start`. Default: none. */
   midiInputs?: MiniAppMidiInput[];
   /** URLs for `comma.asset(path)`. Default: the path itself. */
@@ -111,6 +114,13 @@ export interface MockComma extends Comma {
     screen: { awake: boolean; fullscreen: boolean };
     /** Sends samples to the open microphone streams. */
     microphone(samples: Float32Array): void;
+    /** Sends the full input channel set to multichannel streams, applying their channel selection. */
+    microphoneChannels(samples: Float32Array[]): void;
+    /**
+     * Connects or removes audio inputs: `comma.microphone.watch` listeners get the new list, and a microphone
+     * stream of a removed input ends with `ended`.
+     */
+    audioInputs(inputs: MiniAppAudioInput[]): void;
     /** Sends a message to the open MIDI streams. */
     midi(message: MiniAppMidiMessage): void;
     /** Stored values by scope, then key. */
@@ -167,7 +177,32 @@ export function createMockComma(options: MockCommaOptions = {}): MockComma {
     haptics: [],
     screen: { awake: false, fullscreen: false },
     microphone: (samples) => {
-      for (const stream of microphones) frame.streamData(stream, samples.slice());
+      for (const [stream, input] of microphones)
+        if (!input.channels) frame.streamData(stream, samples.slice());
+    },
+    microphoneChannels: (samples) => {
+      for (const [stream, input] of microphones) {
+        if (!input.channels) continue;
+        if (samples.length !== input.channelCount)
+          throw new Error("Provide the full input channel set to the microphone mock.");
+        frame.streamData(
+          stream,
+          input.channels.map((channel) => samples[channel]!.slice())
+        );
+      }
+    },
+    audioInputs: (inputs) => {
+      audioInputs = inputs.map((input) => ({ ...input }));
+      for (const [stream, input] of microphones)
+        if (!audioInputs.some((device) => device.id === input.id)) {
+          microphones.delete(stream);
+          frame.streamEnd(stream, "ended");
+        }
+      for (const stream of deviceWatches)
+        frame.streamData(
+          stream,
+          audioInputs.map((input) => ({ ...input }))
+        );
     },
     midi: (message) => {
       for (const stream of midis)
@@ -234,7 +269,15 @@ export function createMockComma(options: MockCommaOptions = {}): MockComma {
   };
 
   let streamSerial = 0;
-  const microphones = new Set<number>();
+  /** Open microphone streams, with the ID of the input each records. */
+  const microphones = new Map<
+    number,
+    { id: string; channelCount: number | undefined; channels: number[] | undefined }
+  >();
+  const deviceWatches = new Set<number>();
+  let audioInputs: MiniAppAudioInput[] = (
+    options.audioInputs ?? [{ id: "default", name: "Microphone" }]
+  ).map((input) => ({ ...input }));
   const midis = new Set<number>();
 
   const drivePath = (path: unknown) => {
@@ -338,11 +381,49 @@ export function createMockComma(options: MockCommaOptions = {}): MockComma {
         return null;
       case "clipboard.read":
         return { text: options.clipboardText ?? state.clipboard.at(-1) ?? "" };
+      case "microphone.devices":
+        return { devices: audioInputs.map((input) => ({ ...input })) };
+      case "microphone.watch":
+        deviceWatches.add(++streamSerial);
+        return {
+          stream: streamSerial,
+          devices: audioInputs.map((input) => ({ ...input })),
+        };
       case "microphone.start":
-        microphones.add(++streamSerial);
-        return { stream: streamSerial, sampleRate: options.sampleRate ?? 48_000 };
+      case "microphone.startChannels": {
+        const device =
+          args.deviceId === undefined
+            ? audioInputs[0]
+            : audioInputs.find((input) => input.id === args.deviceId);
+        if (!device) return fail("unavailable", "There is no microphone.");
+        const channelCount =
+          op === "microphone.startChannels" ? Number(args.channelCount) : undefined;
+        if (
+          channelCount !== undefined &&
+          device.channelCount &&
+          (channelCount < device.channelCount.min ||
+            channelCount > device.channelCount.max)
+        )
+          return fail(
+            "unavailable",
+            "The requested input channel count is not supported."
+          );
+        const channels =
+          channelCount === undefined
+            ? undefined
+            : ((args.channels as number[] | undefined) ??
+              Array.from({ length: channelCount }, (_, index) => index));
+        microphones.set(++streamSerial, { id: device.id, channelCount, channels });
+        return {
+          stream: streamSerial,
+          ...(channels ? { channelCount, channels } : {}),
+          sampleRate: options.sampleRate ?? 48_000,
+          device: { ...device },
+        };
+      }
       case "microphone.stop":
         microphones.delete(Number(args.stream));
+        deviceWatches.delete(Number(args.stream));
         return null;
       case "midi.start":
         midis.add(++streamSerial);

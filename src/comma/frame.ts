@@ -25,7 +25,7 @@ export interface FrameCommaOptions {
 export interface FrameComma {
   comma: Comma;
   setTheme(change: MiniAppThemeChange): void;
-  /** Data of an open stream (`microphone.start`, `midi.start`). */
+  /** Data of an open stream (`microphone.start`, `microphone.watch`, `midi.start`). */
   streamData(stream: number, data: unknown): void;
   /** The host ended a stream, or the app stopped. */
   streamEnd(stream: number, reason: string): void;
@@ -169,11 +169,12 @@ export function createFrameComma(options: FrameCommaOptions): FrameComma {
     start: string,
     stopOp: string,
     onData: (value: never) => void,
-    onEnd: ((reason: string) => void) | undefined
+    onEnd: ((reason: string) => void) | undefined,
+    args: Record<string, unknown> = {}
   ): Promise<Omit<T, "stream"> & MiniAppStreamHandle> => {
     if (typeof onData !== "function")
       throw new CommaError("invalid", "The listener must be a function.");
-    const opened = (await invoke(start, {})) as T;
+    const opened = (await invoke(start, args)) as T;
     const stream = opened.stream;
     // Port messages are ordered: no data of this stream arrives before the start's result.
     streams.set(stream, { data: onData as (value: unknown) => void, end: onEnd });
@@ -274,8 +275,58 @@ export function createFrameComma(options: FrameCommaOptions): FrameComma {
     open: async (url) =>
       (await invoke("links.open", { url: requireText("url", url) })) as never,
     microphone: {
-      start: (onSamples, onEnd) =>
-        listen("microphone.start", "microphone.stop", onSamples, onEnd) as never,
+      startChannels: async (captureOptions, onSamples, onEnd) => {
+        const count = captureOptions?.channelCount;
+        if (!Number.isInteger(count) || count < 1 || count > 32)
+          throw new CommaError(
+            "invalid",
+            "channelCount must be an integer from 1 to 32."
+          );
+        const channels = captureOptions.channels;
+        if (
+          channels !== undefined &&
+          (!Array.isArray(channels) ||
+            channels.length === 0 ||
+            channels.length > count ||
+            channels.some(
+              (channel) => !Number.isInteger(channel) || channel < 0 || channel >= count
+            ) ||
+            new Set(channels).size !== channels.length)
+        )
+          throw new CommaError(
+            "invalid",
+            "channels must contain unique input indices below channelCount."
+          );
+        return (await listen(
+          "microphone.startChannels",
+          "microphone.stop",
+          onSamples,
+          onEnd,
+          {
+            channelCount: count,
+            ...(channels === undefined ? {} : { channels: [...channels] }),
+            ...(captureOptions.deviceId === undefined
+              ? {}
+              : { deviceId: requireText("deviceId", captureOptions.deviceId) }),
+          }
+        )) as never;
+      },
+      devices: async () =>
+        ((await invoke("microphone.devices", {})) as { devices: never }).devices,
+      watch: (onChange, onEnd) =>
+        listen("microphone.watch", "microphone.stop", onChange, onEnd) as never,
+      start: async (onSamples, onEnd, startOptions) => {
+        const args: { deviceId?: string } = {};
+        if (startOptions?.deviceId !== undefined)
+          args.deviceId = requireText("deviceId", startOptions.deviceId);
+        return (await listen(
+          "microphone.start",
+          "microphone.stop",
+          onSamples,
+          onEnd,
+          args
+        )) as never;
+      },
     },
     camera: {
       capture: async (captureOptions) => {

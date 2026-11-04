@@ -61,8 +61,9 @@ npm run build   # dist/index.html (and dist-worker/index.js with a backend)
 
 ## Device capabilities
 
-The app frame has no device access of its own. Comma uses the device for the
-app after the viewer allows it, and sends the app only the result.
+Comma runs SDK device operations in the host after the viewer allows them.
+Declared `usb` and `bluetooth` capabilities use browser APIs directly in the
+opaque frame. No separate app domain is required.
 
 | Capability       | SDK                                         | Viewer                      |
 | ---------------- | ------------------------------------------- | --------------------------- |
@@ -75,10 +76,48 @@ app after the viewer allows it, and sends the app only the result.
 | `share`          | `comma.share({ title?, text?, url? })`      | Uses the system share sheet |
 | `haptics`        | `comma.haptics(ms or [on, off, on, ...])`   | No grant                    |
 | `midi`           | `comma.midi.start(onMessage, onEnd?)`       | Grants once                 |
+| `usb`            | `navigator.usb`                             | Device chooser              |
+| `bluetooth`      | `navigator.bluetooth`                       | Device chooser              |
 
+- USB and Bluetooth device selection needs a user click and a supported browser.
+  Web Bluetooth uses BLE/GATT. WebUSB does not replace Web Serial or WebHID.
+  Check `navigator.usb` or `navigator.bluetooth` before use, rather than `comma.supports(op)`.
+  Device grants belong to the top-level Comma origin. Other apps with that declared
+  capability can access previously authorized devices. A separate iframe origin
+  does not give these browser grants a per-app scope.
+  Electron shows a device chooser and keeps selected device permissions in memory.
 - `microphone.start` calls `onSamples` with mono PCM chunks (`Float32Array`,
   -1 to 1) at the returned `sampleRate`, without echo cancellation, noise
   suppression or gain. Call `stop()` on the returned handle when done.
+- `comma.microphone.devices()` lists audio inputs with `id`, `name`, and optional
+  `channelCount` and `sampleRate` ranges (`{ min, max }`). Missing ranges mean
+  the browser did not expose them. They do not identify physical ports. Give
+  an `id` to `microphone.start(onSamples, onEnd, { deviceId })` to record that
+  input; without it, the system default records. The handle's `device` is the
+  input that records. When that input is removed, `onEnd` gets `ended`.
+- `comma.microphone.startChannels(options, onSamples, onEnd?)` records separate
+  input channels. Set `options.channelCount` to the exact input count (1 to 32,
+  within the browser and device limits). Set `deviceId` to select an input.
+  Optional `channels` selects zero-based indices in delivery order, without duplicates.
+  Without `channels`, all input channels are delivered. The callback receives
+  a `Float32Array[]`, one PCM array per selected channel, at the handle's `sampleRate`.
+  The handle also returns `channelCount`, `channels`, `device`, and `stop()`.
+  Unsupported counts fail. The host does not silently mix down to fewer channels.
+  Capability ranges do not guarantee every combination. The browser can resample
+  the input; `sampleRate` describes the delivered PCM, not the device's native rate.
+  This call uses the same microphone grant and lifetime as `start`.
+
+  ```ts
+  const recording = await comma.microphone.startChannels(
+    { deviceId, channelCount: 4, channels: [2, 0] },
+    ([thirdInput, firstInput]) => processAudio(thirdInput, firstInput),
+    (reason) => showStopped(reason),
+  );
+  // Later: await recording.stop();
+  ```
+
+- `comma.microphone.watch(onChange, onEnd?)` returns the current `devices` and
+  calls `onChange` with the new list when an input is connected or removed.
 - `midi.start` returns the input devices and calls `onMessage` with
   `{ input, data, time }` for each message. System exclusive messages are not
   sent.
