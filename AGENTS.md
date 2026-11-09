@@ -58,12 +58,29 @@ check its last section before each deploy. In short:
    Also check the app in a headless browser: run `npm run dev` and open
    the printed URL. Outside Comma, `src/main.tsx` installs the mock, so every
    `comma.*` call works with in-memory data.
-4. Deploy: call the station tool `app_deploy` with short `notes` on what
+4. Cover: the Apps gallery shows a screenshot of the app's first screen.
+   Make it in the headless browser, with the app on `npm run dev`:
+   - Set the viewport to 390 × 844 with device scale 2, in the light theme.
+   - Show the first screen as a user sees it after some use. If it is empty,
+     add sample data through the app first.
+   - Capture the top 390 × 293 CSS pixels as JPEG at quality 80. The result
+     is 780 × 586 pixels. With Playwright: a page from
+     `{ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }`, then
+     `page.screenshot({ type: "jpeg", quality: 80, clip: { x: 0, y: 0, width: 390, height: 293 } })`.
+     WebP is smaller; use it only when the browser or an encoder at hand
+     writes it (Playwright does not).
+   - Save it as `public/cover.jpg` (or `.webp`) and set `"cover": "cover.jpg"`
+     in `comma-app.json`. Then run `npm run build` again, which copies it to
+     `dist/`.
+   The cover must be at most 160 KiB and 1200 × 1200 pixels. Every gallery
+   viewer downloads it, so do not use PNG. Make a new cover when the first
+   screen changes.
+5. Deploy: call the station tool `app_deploy` with short `notes` on what
    changed. It commits and pushes your work, then sends the build to Comma.
    Fix every error it returns and call it again. The user sees the new
    version in the chat. Report its app ID and Version to the Router.
    The Router can publish with `internal.apps.publish` after this Task is ready for review.
-5. Backend errors: call the station tool `app_logs`.
+6. Backend errors: call the station tool `app_logs`.
 
 Run `npm run build` before each `app_deploy`. Never edit `dist/` or
 `dist-worker/` by hand.

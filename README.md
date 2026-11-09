@@ -40,6 +40,7 @@ npm run build   # dist/index.html (and dist-worker/index.js with a backend)
   "name": "Habit tracker",
   "description": "Track daily habits.",
   "icon": "icon.png",
+  "cover": "cover.jpg",
   "capabilities": ["identity.basic", "ai.chat"],
   "storage": ["user", "device"],
   "backend": {
@@ -52,6 +53,9 @@ npm run build   # dist/index.html (and dist-worker/index.js with a backend)
 
 - `name`: 1 to 60 characters.
 - `icon`: a PNG, SVG or WebP file in `dist/` (at most 256 KiB). Optional.
+- `cover`: a JPEG, WebP or PNG screenshot of the first screen in `dist/`, for the
+  Apps gallery (at most 160 KiB and 1200 × 1200 pixels; 780 × 585 is enough).
+  Optional. See AGENTS.md for how to make it.
 - `capabilities`: `identity.basic`, `ai.chat`, `web.search`, `chat.draft`, `tasks.create`,
   `files.pick`, `drive.app_folder`, `calendar.read`, `notifications`,
   `clipboard.write`, `links.open`, and the device capabilities below.
