@@ -57,7 +57,10 @@ check its last section before each deploy. In short:
 3. Test: `npm test` runs the unit tests with the mock (`src/comma/mock.ts`).
    Also check the app in a headless browser: run `npm run dev` and open
    the printed URL. Outside Comma, `src/main.tsx` installs the mock, so every
-   `comma.*` call works with in-memory data.
+   `comma.*` call works with in-memory data. If `CHROMIUM_BIN` is set, the
+   machine has a browser at that path: use it and do not download one. With
+   Playwright: install `playwright-core` and launch with
+   `{ executablePath: process.env.CHROMIUM_BIN }`.
 4. Cover: the Apps gallery shows a screenshot of the app's first screen.
    Make it in the headless browser, with the app on `npm run dev`:
    - Set the viewport to 390 × 844 with device scale 2, in the light theme.
